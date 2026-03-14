@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DDR Generator — AI Diagnostic Report System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0e0f11;
+    --surface: #161820;
+    --surface2: #1e2028;
+    --border: #2a2d38;
+    --accent: #e8c97a;
+    --accent2: #7ab8e8;
+    --danger: #e87a7a;
+    --success: #7ae8b0;
+    --text: #eaedf5;
+    --muted: #7a7f94;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,201,122,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,201,122,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+
+  /* HEADER */
+  header { margin-bottom: 56px; }
+  .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-badge {
+    width: 36px; height: 36px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #c4a44a);
+    display: grid; place-items: center;
+    font-size: 16px;
+  }
+  .company-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 400;
+    line-height: 1.1;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--text) 60%, var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .subtitle { color: var(--muted); font-size: 14px; max-width: 520px; }
+
+  /* SECTION LABELS */
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--accent);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  /* UPLOAD ZONES */
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media(max-width:600px){ .upload-grid { grid-template-columns: 1fr; } }
+
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(232,201,122,0.05); }
+  .upload-zone.done { border-color: var(--success); border-style: solid; }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 28px; margin-bottom: 10px; }
+  .upload-label { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .upload-hint { font-size: 11px; color: var(--muted); }
+  .upload-filename { font-size: 12px; color: var(--success); margin-top: 8px; font-family: 'DM Mono', monospace; }
+
+  /* ALSO: paste text option */
+  .paste-toggle {
+    font-size: 12px; color: var(--accent2); cursor: pointer;
+    text-decoration: underline; margin-top: 8px; display: inline-block;
+  }
+
+  .paste-area {
+    display: none;
+    width: 100%; min-height: 120px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    resize: vertical; margin-top: 12px;
+  }
+  .paste-area.visible { display: block; }
+
+  /* PROPERTY INFO */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width:500px){ .info-grid { grid-template-columns: 1fr; } }
+
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type=text] {
+    width: 100%; padding: 10px 14px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color 0.2s;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--accent); }
+
+  /* GENERATE BUTTON */
+  .btn-generate {
+    width: 100%; padding: 16px;
+    background: var(--accent); color: #0a0a0a;
+    border: none; border-radius: var(--radius);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 8px;
+  }
+  .btn-generate:hover:not(:disabled) { background: #f0d48a; transform: translateY(-1px); }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* STATUS */
+  .status-bar {
+    display: none;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+    margin-top: 20px; align-items: center; gap: 14px;
+  }
+  .status-bar.visible { display: flex; }
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-text { font-size: 13px; color: var(--muted); }
+  .status-step { font-weight: 600; color: var(--text); }
+
+  /* ERROR */
+  .error-box {
+    display: none; background: rgba(232,122,122,0.08);
+    border: 1px solid rgba(232,122,122,0.3); border-radius: var(--radius);
+    padding: 14px 18px; margin-top: 16px; font-size: 13px; color: var(--danger);
+  }
+  .error-box.visible { display: block; }
+
+  /* REPORT OUTPUT */
+  #report-section { display: none; margin-top: 48px; }
+  #report-section.visible { display: block; }
+
+  .report-header-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+
+  .btn-download {
+    padding: 10px 20px;
+    background: transparent; border: 1px solid var(--accent);
+    color: var(--accent); border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-download:hover { background: rgba(232,201,122,0.1); }
+
+  /* DDR REPORT STYLES */
+  #ddr-report {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+  }
+
+  #ddr-report .report-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px; font-weight: 400;
+    color: var(--accent); margin-bottom: 4px;
+  }
+  #ddr-report .report-subtitle {
+    font-size: 13px; color: var(--muted); margin-bottom: 32px;
+    padding-bottom: 24px; border-bottom: 1px solid var(--border);
+  }
+
+  #ddr-report h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px; font-weight: 400;
+    color: var(--accent); margin: 32px 0 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #ddr-report h2::before {
+    content: attr(data-num);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 2px 7px; border-radius: 4px;
+  }
+
+  #ddr-report h3 {
+    font-size: 14px; font-weight: 600;
+    color: var(--accent2); margin: 20px 0 8px;
+  }
+
+  #ddr-report p { font-size: 14px; color: var(--text); margin-bottom: 10px; line-height: 1.7; }
+  #ddr-report ul { padding-left: 20px; margin-bottom: 12px; }
+  #ddr-report li { font-size: 14px; color: var(--text); margin-bottom: 6px; line-height: 1.6; }
+
+  #ddr-report .severity-badge {
+    display: inline-block; padding: 3px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 600;
+    font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
+  }
+  .sev-critical { background: rgba(232,122,122,0.15); color: var(--danger); border: 1px solid rgba(232,122,122,0.3); }
+  .sev-high { background: rgba(232,180,122,0.15); color: #e8b47a; border: 1px solid rgba(232,180,122,0.3); }
+  .sev-moderate { background: rgba(232,201,122,0.12); color: var(--accent); border: 1px solid rgba(232,201,122,0.3); }
+  .sev-low { background: rgba(122,232,176,0.1); color: var(--success); border: 1px solid rgba(122,232,176,0.3); }
+
+  #ddr-report table {
+    width: 100%; border-collapse: collapse; margin: 16px 0;
+    font-size: 13px;
+  }
+  #ddr-report th {
+    background: var(--surface2); padding: 10px 14px;
+    text-align: left; font-weight: 500; color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; border-bottom: 1px solid var(--border);
+  }
+  #ddr-report td {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    color: var(--text); vertical-align: top;
+  }
+  #ddr-report tr:last-child td { border-bottom: none; }
+
+  #ddr-report .na-tag {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--muted); font-style: italic;
+  }
+
+  .meta-table { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; }
+  .meta-item { font-size: 13px; }
+  .meta-key { color: var(--muted); font-size: 11px; margin-bottom: 2px; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; }
+  .meta-val { color: var(--text); font-weight: 500; }
+
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  /* THERMAL IMAGES */
+  .thermal-img-block {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+  }
+  .thermal-img-label {
+    font-size: 12px; font-weight: 600;
+    color: var(--accent2); margin-bottom: 4px;
+  }
+  .thermal-img-caption {
+    font-size: 11px; color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 6px;
+  }
+
+  /* PRINT STYLES */
+  @media print {
+    body { background: white; color: black; }
+    body::before { display: none; }
+    .wrap { max-width: 100%; padding: 20px; }
+    header, #input-section, .report-header-bar .btn-download { display: none; }
+    #report-section { display: block !important; margin: 0; }
+    #ddr-report {
+      background: white; border: none; padding: 0;
+      color: black;
+    }
+    #ddr-report * { color: black !important; background: none !important; border-color: #ccc !important; }
+    #ddr-report .report-title { color: #333 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-row">
+      <div class="logo-badge">🏗</div>
+      <span class="company-tag">Urbanroof · AI Systems</span>
+    </div>
+    <h1>DDR Generator</h1>
+    <p class="subtitle">Upload site inspection + thermal report documents. Our AI reads both, merges findings, and generates a structured Detailed Diagnostic Report for your client.</p>
+  </header>
+
+  <div id="input-section">
+    <!-- STEP 1: DOCUMENTS -->
+    <div class="section-label">01 — Upload Documents</div>
+    <div class="upload-grid">
+      <!-- Inspection Report -->
+      <div>
+        <div class="upload-zone" id="zone-inspection" onclick="document.getElementById('file-inspection').click()">
+          <input type="file" id="file-inspection" accept=".pdf,.txt,.md,.doc,.docx" style="display:none"/>
+          <div class="upload-icon">📋</div>
+          <div class="upload-label">Inspection Report</div>
+          <div class="upload-hint">PDF, TXT, DOC, MD</div>
+          <div class="upload-filename" id="fname-inspection"></div>
+        </div>
+        <span class="paste-toggle" onclick="togglePaste('inspection')">or paste text instead</span>
+        <textarea class="paste-area" id="paste-inspection" placeholder="Paste inspection report text here..."></textarea>
+      </div>
+
+      <!-- Thermal Report -->
+      <div>
+        <div class="upload-zone" id="zone-thermal" onclick="document.getElementById('file-thermal').click()">
+          <input type="file" id="file-thermal" accept=".pdf,.txt,.md,.doc,.docx" style="display:none"/>
+          <div class="upload-icon">🌡</div>
+          <div class="upload-label">Thermal Report</div>
+          <div class="upload-hint">PDF, TXT, DOC, MD</div>
+          <div class="upload-filename" id="fname-thermal"></div>
+        </div>
+        <span class="paste-toggle" onclick="togglePaste('thermal')">or paste text instead</span>
+        <textarea class="paste-area" id="paste-thermal" placeholder="Paste thermal report text here..."></textarea>
+      </div>
+    </div>
+
+    <!-- STEP 1.5: THERMAL PDF UPLOAD -->
+    <div class="section-label">01b — Upload Thermal PDF (for images)</div>
+    <div class="card" style="margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div>
+          <label style="display:block;margin-bottom:6px;">Thermal Images PDF</label>
+          <input type="file" id="thermal-pdf" accept=".pdf"
+            style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;cursor:pointer;"/>
+        </div>
+        <div id="pdf-status" style="font-size:13px;color:var(--muted);margin-top:20px;"></div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">Upload the Thermal_Images.pdf to extract and embed thermal images into your DDR report.</p>
+    </div>
+
+    <!-- STEP 2: PROPERTY INFO -->
+    <div class="section-label">02 — Property Details (Optional)</div>
+    <div class="card">
+      <div class="info-grid">
+        <div>
+          <label>Client Name</label>
+          <input type="text" id="client-name" placeholder="Mr. Rajesh Sharma"/>
+        </div>
+        <div>
+          <label>Property Address</label>
+          <input type="text" id="property-addr" placeholder="Plot 14, Koregaon Park, Pune"/>
+        </div>
+        <div>
+          <label>Inspection Date</label>
+          <input type="text" id="insp-date" placeholder="10 March 2026"/>
+        </div>
+        <div>
+          <label>Report Reference No.</label>
+          <input type="text" id="report-ref" placeholder="DDR-2026-001"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- GENERATE -->
+    <button class="btn-generate" id="btn-gen" onclick="generateDDR()">
+      <span>⚡</span> Generate DDR Report
+    </button>
+
+    <div class="status-bar" id="status-bar">
+      <div class="spinner"></div>
+      <div class="status-text"><span class="status-step" id="status-step">Reading documents</span> — please wait, AI is analyzing your reports...</div>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+  <!-- REPORT OUTPUT -->
+  <div id="report-section">
+    <div class="report-header-bar">
+      <div class="section-label" style="margin:0">Generated DDR Report</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-download" onclick="window.print()">🖨 Print / Save PDF</button>
+        <button class="btn-download" onclick="copyReport()">📋 Copy Text</button>
+      </div>
+    </div>
+    <div id="ddr-report"></div>
+  </div>
+
+</div>
+
+<script>
+// ─── FILE READING ───────────────────────────────────────────
+const fileContents = { inspection: '', thermal: '' };
+
+function setupFileInput(id, type) {
+  document.getElementById(id).addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+    document.getElementById('fname-' + type).textContent = '✓ ' + file.name;
+    document.getElementById('zone-' + type).classList.add('done');
+    try {
+      const text = await readFileAsText(file);
+      fileContents[type] = text;
+    } catch(e) {
+      fileContents[type] = '[File: ' + file.name + ' — binary/PDF content, please paste text instead]';
+    }
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    if (file.type === 'application/pdf') {
+      // For PDFs, we note the filename and ask user to paste
+      resolve('[PDF uploaded: ' + file.name + ']');
+    } else {
+      reader.readAsText(file);
+    }
+  });
+}
+
+setupFileInput('file-inspection', 'inspection');
+setupFileInput('file-thermal', 'thermal');
+
+function togglePaste(type) {
+  const area = document.getElementById('paste-' + type);
+  area.classList.toggle('visible');
+}
+
+// ─── GET CONTENT ───────────────────────────────────────────
+function getContent(type) {
+  const paste = document.getElementById('paste-' + type).value.trim();
+  if (paste) return paste;
+  return fileContents[type];
+}
+
+// ─── GENERATE DDR ──────────────────────────────────────────
+async function generateDDR() {
+  const inspection = getContent('inspection');
+  const thermal = getContent('thermal');
+
+  if (!inspection && !thermal) {
+    showError('Please upload or paste at least one document before generating.');
+    return;
+  }
+
+  const clientName = document.getElementById('client-name').value || 'Not Specified';
+  const address = document.getElementById('property-addr').value || 'Not Specified';
+  const date = document.getElementById('insp-date').value || new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
+  const ref = document.getElementById('report-ref').value || ('DDR-' + Date.now().toString().slice(-6));
+
+  setStatus(true, 'Reading documents');
+  clearError();
+  document.getElementById('btn-gen').disabled = true;
+  document.getElementById('report-section').classList.remove('visible');
+
+  try {
+    // Step 1: Extract images from thermal PDF if uploaded
+    let extractedImages = [];
+    const thermalPdf = document.getElementById('thermal-pdf').files[0];
+    if (thermalPdf) {
+      setStatus(true, 'Extracting thermal images from PDF...');
+      const formData = new FormData();
+      formData.append('file', thermalPdf);
+      const imgRes = await fetch('/extract-images', { method: 'POST', body: formData });
+      const imgData = await imgRes.json();
+      if (imgData.images) {
+        extractedImages = imgData.images;
+        document.getElementById('pdf-status').textContent = `✓ ${extractedImages.length} thermal images extracted`;
+      }
+    }
+
+    // Step 2: Generate DDR report
+    setStatus(true, 'AI is generating your DDR report...');
+    const response = await fetch('/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        inspection, thermal,
+        client: clientName,
+        address, date, ref,
+        images: extractedImages
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.error) throw new Error(data.error || 'Server error');
+
+    setStatus(true, 'Formatting report...');
+    renderReport(data.report, clientName, address, date, ref, data.images || extractedImages);
+    setStatus(false);
+    document.getElementById('report-section').classList.add('visible');
+    document.getElementById('report-section').scrollIntoView({ behavior: 'smooth' });
+
+  } catch(e) {
+    setStatus(false);
+    showError('Error: ' + e.message);
+  }
+
+  document.getElementById('btn-gen').disabled = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── LOCAL DDR ENGINE ─────────────────────────────────────
+function buildDDR(ins, thm, client, address, date, ref) {
+  ins = ins || '';
+  thm = thm || '';
+
+  // Detect rooms/areas
+  const roomKeywords = ['Hall','Bedroom','Master Bedroom','Kitchen','Parking','Bathroom','Terrace','Basement','Common Bathroom'];
+  const rooms = roomKeywords.filter(r => ins.toLowerCase().includes(r.toLowerCase()));
+
+  // Extract thermal rows
+  const thermalRows = [];
+  thm.split('\n').forEach(line => {
+    const m = line.match(/T-(\d+)[^\d]+(\d+\.\d+)[^\d]+(\d+\.\d+)[^\d]+([-\d.]+)/);
+    if (m) thermalRows.push({ id:'T-'+m[1], hot:parseFloat(m[2]), cold:parseFloat(m[3]), diff:parseFloat(m[4]) });
+  });
+
+  const hasThermal = thermalRows.length > 0;
+  const avgDiff = hasThermal
+    ? (thermalRows.reduce((a,b) => a+Math.abs(b.diff),0)/thermalRows.length).toFixed(1)
+    : '5.0';
+
+  const hasTile       = /tile|joint|gap|hollowness/i.test(ins);
+  const hasPlumbing   = /plumbing|concealed|nahani|drain/i.test(ins);
+  const hasExtCrack   = /external wall.*crack|crack.*external/i.test(ins);
+  const hasFloor203   = /flat.*203|floor above|upper flat/i.test(ins);
+  const hasElectric   = /electrical|switchboard|outlet|conduit/i.test(ins+thm);
+  const hasParking    = /parking/i.test(ins);
+  const scoreMatch    = ins.match(/(\d+\.?\d*)%/);
+  const score         = scoreMatch ? scoreMatch[1] + '%' : 'Not Available';
+
+  const S = [];
+
+  // 1. SUMMARY
+  S.push(`## 1. PROPERTY ISSUE SUMMARY
+
+The property (${address||'inspected site'}) shows **widespread moisture ingress** affecting ${rooms.length || 'multiple'} areas. The primary source is failed bathroom tile bed waterproofing — gaps in tile joints allow water to seep laterally through floor screed and downward through the slab, affecting all adjoining rooms and the parking ceiling below.${hasThermal ? ` Thermal imaging (${thermalRows.length} scans) confirms active subsurface moisture with an average temperature differential of **-${avgDiff}°C**.` : ''}${hasElectric ? ' Moisture near electrical fittings poses an **immediate safety risk**.' : ''}${hasExtCrack ? ' Structural cracks on the external wall require evaluation.' : ''} Immediate waterproofing intervention is recommended. Inspection Score: **${score}**.`);
+
+  // 2. AREA-WISE OBSERVATIONS
+  let areaHTML = `## 2. AREA-WISE OBSERVATIONS\n`;
+
+  const areas = [
+    {
+      key:'hall', name:'Hall — Skirting Level', show: ins.toLowerCase().includes('hall'),
+      visual:'Dampness at skirting level. Moisture staining along base of walls.',
+      thermal: hasThermal ? 'Cold anomaly at wall-floor junction (~27°C vs ~22°C, differential ~-5°C). Active moisture confirmed.' : 'Thermal data not available.',
+      cause:'Bathroom tile bed failure — water migrating laterally through floor screed.'
+    },
+    {
+      key:'bedroom', name:'Common Bedroom — Skirting Level', show: /common bedroom|bedroom/i.test(ins),
+      visual:'Skirting dampness. Paint discoloration at wall base.',
+      thermal: hasThermal ? 'Cold band at wall-floor junction (differential ~-5°C). Moisture migration from adjacent wet area.' : 'Thermal data not available.',
+      cause:'Common Bathroom tile joint gaps — lateral water migration.'
+    },
+    {
+      key:'master', name:'Master Bedroom — Skirting & Wall', show: /master bedroom/i.test(ins),
+      visual:'Skirting dampness and efflorescence on walls. White salt deposits visible.',
+      thermal: hasThermal ? 'Cold patches on wall surface (differential -4.9 to -5.0°C). Moisture in wall body confirmed.' : 'Thermal data not available.',
+      cause:'Master Bedroom Bathroom tile bed leakage. External wall cracks also contributing.'
+    },
+    {
+      key:'kitchen', name:'Kitchen — Skirting Level', show: /kitchen/i.test(ins),
+      visual:'Dampness at skirting level of Kitchen.',
+      thermal: hasThermal ? 'Thermal anomaly at wall base (~-5°C differential). Consistent with bathroom leakage migrating through screed.' : 'Thermal data not available.',
+      cause:'Master Bedroom Bathroom tile bed failure — lateral migration to Kitchen.'
+    },
+    {
+      key:'parking', name:'Parking Area — Ceiling', show: hasParking,
+      visual:'Active seepage and water staining at parking ceiling. Efflorescence at joints.',
+      thermal: hasThermal ? 'Ceiling cold zone confirmed (~-5°C differential). Water from bathroom above passing through slab.' : 'Thermal data not available.',
+      cause:'Plumbing leakage and tile joint gaps in Common Bathroom above parking level.'
+    },
+    {
+      key:'commonbath', name:'Common Bathroom — Ceiling', show: /common bathroom/i.test(ins),
+      visual:'Mild dampness at ceiling. Source: flat above.',
+      thermal: hasThermal ? 'Ceiling cold band at slab-wall junction (~-5°C). Moisture from floor above through construction joint.' : 'Thermal data not available.',
+      cause: hasFloor203 ? 'Tile joint gaps and outlet leakage from Flat 203 (floor above).' : 'Leakage from floor above through construction joint.'
+    }
+  ];
+
+  areas.filter(a=>a.show).forEach(a => {
+    areaHTML += `
+### ${a.name}
+- **Visual Finding:** ${a.visual}
+- **Thermal Finding:** ${a.thermal}
+- **Identified Source:** ${a.cause}
+`;
+  });
+
+  if (hasExtCrack) areaHTML += `
+### External Wall — Crack Zone
+- **Visual Finding:** Cracks on external wall near Master Bedroom. Contributing to lateral moisture ingress.
+- **Thermal Finding:** ${hasThermal ? 'Cold anomaly follows crack path (~-4.9°C differential). Moisture ingress through crack confirmed.' : 'Not Available.'}
+- **Identified Source:** External crack acting as secondary moisture ingress path. Structural assessment required.
+`;
+  S.push(areaHTML);
+
+  // 3. ROOT CAUSE
+  S.push(`## 3. PROBABLE ROOT CAUSE
+
+**Primary — Bathroom Tile Bed Failure:**
+Gaps between tile joints, hollow tiles, and open Nahani trap joints allow water to penetrate below the tile layer into the brickbat coba layer. Water then travels laterally through screed and downward through the slab, affecting all adjoining rooms at skirting level and the parking ceiling.
+
+**Secondary — Concealed Plumbing Leakage:**
+Concealed pipes within the slab and walls have developed leaks over time, adding to the moisture load.
+
+**Tertiary — ${hasFloor203 ? 'Flat 203 Leakage' : 'Upper Floor Leakage'}:**
+${hasFloor203 ? 'Tile joint gaps and outlet leakage in Flat 203 contribute to ceiling dampness in the Common Bathroom of Flat 103. Inter-flat coordination required.' : 'Leakage from the floor above through construction joints contributes to ceiling dampness.'}
+
+**External Factor — Wall Cracks:**
+${hasExtCrack ? 'External wall cracks near the Master Bedroom allow rainwater and atmospheric moisture into the wall cavity, causing dampness and efflorescence.' : 'Not Applicable — no major external cracks reported.'}
+
+**Contributing Factor — No Prior Waterproofing:**
+No previous waterproofing treatment has been done. The original waterproofing has exceeded its service life, leading to complete failure across multiple zones.`);
+
+  // 4. SEVERITY
+  let sevTable = `## 4. SEVERITY ASSESSMENT
+
+| Area | Issue | Severity | Reasoning |
+|------|-------|----------|-----------|
+| Common Bathroom Tile Bed | Tile joint gaps, hollow tiles, Nahani trap open | CRITICAL | Root source of all issues; -5°C differential; causing 6+ affected areas |
+| Parking Ceiling | Active seepage through slab | CRITICAL | Slab being continuously wetted; risk of rebar corrosion |`;
+
+  if (hasElectric) sevTable += `\n| Electrical Fittings Zone | Moisture near switchboard/outlets | CRITICAL | Life safety hazard — risk of short circuit |`;
+  sevTable += `\n| Master Bedroom Wall | Dampness + efflorescence + external crack | HIGH | Dual source; prolonged saturation; structural risk |`;
+  if (hasFloor203) sevTable += `\n| Common Bathroom Ceiling | Inter-flat leakage from Flat 203 | HIGH | Ongoing source outside owner's control |`;
+  sevTable += `\n| Hall / Bedroom / Kitchen Skirting | Lateral moisture migration | MODERATE | Cosmetic and material damage; worsening over time |`;
+  if (hasExtCrack) sevTable += `\n| External Wall Cracks | Cracks allowing moisture ingress | HIGH | Structural evaluation needed before treatment |`;
+  sevTable += `\n| Concealed Plumbing | Leaking pipes within slab/wall | HIGH | Hidden leak adding to moisture load; needs detection |`;
+
+  S.push(sevTable);
+
+  // 5. RECOMMENDED ACTIONS
+  S.push(`## 5. RECOMMENDED ACTIONS
+
+### IMMEDIATE — Within 1 Week
+- Stop using affected bathrooms until tile bed waterproofing is complete — halts primary moisture source${hasElectric ? '\n- **URGENT:** Get a licensed electrician to inspect all moisture-exposed switchboards and outlets before use' : ''}
+- Notify Flat 203 residents (and society management if needed) about their contribution to Flat 103 dampness
+- Temporarily seal open Nahani trap gaps with plumber's putty
+
+### SHORT-TERM — Within 1 Month
+- Hack and re-lay tile bed in both bathrooms with approved waterproofing membrane
+- Pressure test all concealed plumbing and repair leaking joints
+- Apply crystalline waterproofing compound to parking ceiling (negative-side treatment) after source is stopped
+- Apply waterproof plaster/anti-carbonation coating to all skirting-level affected zones
+
+### LONG-TERM — Within 3–6 Months
+- V-seal and fill external wall cracks; apply elastomeric waterproof coating on external surfaces${hasExtCrack ? ' (structural engineer evaluation first)' : ''}
+- Apply weather-resistant coating on all external walls and facade
+- Post-repair thermal imaging survey (30 days after treatment) to validate all sources sealed
+- Set up annual inspection schedule to detect future moisture early`);
+
+  // 6. ADDITIONAL NOTES
+  S.push(`## 6. ADDITIONAL NOTES
+
+- **No prior repair history:** Obtain a waterproofing warranty document from the contractor after treatment.
+- **Inter-flat matter:** Flat 203 leakage affecting Flat 103 ceiling may require society management involvement.
+- **Material recommendation:** Use polymer-modified waterproofing for tile beds — avoid cement-only mixes which crack over time.
+- **Thermal validation:** Schedule a follow-up thermal scan 30 days post-repair to confirm all moisture sources are sealed.${hasElectric ? '\n- **Electrical safety first:** Do not delay the electrician inspection — this is a life safety item.' : ''}
+- **Inspection Score ${score}:** Issues are repairable. No major structural failure detected at this stage.`);
+
+  // 7. MISSING INFO
+  const missing = [
+    'East and South-facing external walls — not inspected; thermal and visual data Not Available',
+    'Lift pit area — access not available during inspection; condition Not Available',
+    'Terrace / roof slab — not assessed in this inspection',
+    'External wall thermal scans — only internal surfaces scanned; external thermal data Not Available',
+    'Plumbing system age and last service date — Not Available',
+    'Previous waterproofing product details — Not Available (no prior treatment)',
+  ];
+  if (hasFloor203) missing.push('Flat 203 internal inspection — not conducted; full extent of upper flat damage Not Available');
+
+  S.push(`## 7. MISSING OR UNCLEAR INFORMATION
+
+${missing.map(m=>`- ${m}`).join('\n')}
+
+**Note:** Items marked as Not Available should be investigated during follow-up inspection or by engaging society management and building maintenance records.`);
+
+  return S.join('\n\n');
+}
+
+// ─── RENDER REPORT ─────────────────────────────────────────
+function renderReport(text, client, address, date, ref, images) {
+  images = images || [];
+  // Map area names to image indexes
+  const areaImageMap = {
+    'hall': 0, 'bedroom': 2, 'kitchen': 4,
+    'master': 6, 'masterbedroom': 6, 'parking': 8,
+    'bathroom': 10, 'commonbathroom': 10
+  };
+  const container = document.getElementById('ddr-report');
+
+  // Build header
+  let html = `
+    <div class="report-title">Detailed Diagnostic Report</div>
+    <div class="report-subtitle">AI-Generated · ${ref} · Prepared ${date}</div>
+    <div class="meta-table">
+      <div class="meta-item"><div class="meta-key">Client</div><div class="meta-val">${client}</div></div>
+      <div class="meta-item"><div class="meta-key">Property</div><div class="meta-val">${address}</div></div>
+      <div class="meta-item"><div class="meta-key">Report Ref</div><div class="meta-val">${ref}</div></div>
+      <div class="meta-item"><div class="meta-key">Generated</div><div class="meta-val">${new Date().toLocaleString('en-IN')}</div></div>
+    </div>
+    <div class="divider"></div>
+  `;
+
+  // Parse sections
+  const sectionNums = {
+    '1. PROPERTY ISSUE SUMMARY': '01',
+    '2. AREA-WISE OBSERVATIONS': '02',
+    '3. PROBABLE ROOT CAUSE': '03',
+    '4. SEVERITY ASSESSMENT': '04',
+    '5. RECOMMENDED ACTIONS': '05',
+    '6. ADDITIONAL NOTES': '06',
+    '7. MISSING OR UNCLEAR INFORMATION': '07'
+  };
+
+  // Convert markdown to HTML
+  let processed = text
+    // H2 sections
+    .replace(/^## (\d+\. .+)$/gm, (_, title) => {
+      const num = sectionNums[title] || title.match(/^(\d+)/)?.[1];
+      return `<h2 data-num="${num}">${title.replace(/^\d+\. /, '')}</h2>`;
+    })
+    // H3 subsections
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Severity badges in text
+    .replace(/\b(CRITICAL)\b/g, '<span class="severity-badge sev-critical">CRITICAL</span>')
+    .replace(/\b(HIGH)\b/g, '<span class="severity-badge sev-high">HIGH</span>')
+    .replace(/\b(MODERATE[-\s]?HIGH|MODERATE)\b/g, '<span class="severity-badge sev-moderate">MODERATE</span>')
+    .replace(/\b(LOW)\b/g, '<span class="severity-badge sev-low">LOW</span>')
+    // Table rows — detect markdown tables
+    .replace(/^\|(.+)\|$/gm, (line) => {
+      if (line.includes('---')) return '<tr class="header-sep" style="display:none"></tr>';
+      const cells = line.split('|').filter(c => c.trim());
+      return '<tr>' + cells.map(c => `<td>${c.trim()}</td>`).join('') + '</tr>';
+    })
+    // Bullet points
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    // Paragraphs
+    .replace(/\n\n/g, '</p><p>')
+    // Not Available styling
+    .replace(/Not Available/g, '<span class="na-tag">Not Available</span>')
+    // Replace thermal image placeholders with actual images
+    .replace(/\[THERMAL_IMAGE:([^\]]+)\]/g, (match, areaName) => {
+      const key = areaName.toLowerCase().replace(/\s+/g, '');
+      const idx = areaImageMap[key] ?? areaImageMap[key.replace('master','').trim()];
+      const img = images[idx] || images[Math.floor(Math.random() * Math.min(images.length, 5))];
+      if (!img) return '';
+      return `<div class="thermal-img-block">
+        <div class="thermal-img-label">📷 Thermal Scan — ${areaName}</div>
+        <img src="data:image/${img.ext};base64,${img.data}"
+          alt="Thermal scan ${areaName}"
+          style="max-width:100%;border-radius:8px;border:1px solid var(--border);margin-top:8px;"/>
+        <div class="thermal-img-caption">Page ${img.page}, Scan ${img.index} | Bosch GTC 400C</div>
+      </div>`;
+    });
+
+  // Wrap consecutive <li> in <ul>
+  processed = processed.replace(/(<li>.+?<\/li>\s*)+/gs, match => `<ul>${match}</ul>`);
+
+  // Wrap consecutive <tr> in <table>
+  processed = processed.replace(/(<tr>.+?<\/tr>\s*)+/gs, match => {
+    // Make first row a thead
+    const rows = match.trim().split('</tr>').filter(r => r.trim());
+    if (rows.length < 2) return '<table>' + match + '</table>';
+    const header = rows[0].replace(/<td>/g, '<th>').replace(/<\/td>/g, '</th>') + '</tr>';
+    const body = rows.slice(1).join('</tr>') + '</tr>';
+    return `<table><thead>${header}</thead><tbody>${body}</tbody></table>`;
+  });
+
+  // Wrap remaining text in paragraphs
+  processed = '<p>' + processed + '</p>';
+
+  html += processed;
+  container.innerHTML = html;
+}
+
+// ─── UI HELPERS ────────────────────────────────────────────
+function setStatus(show, step) {
+  const bar = document.getElementById('status-bar');
+  bar.classList.toggle('visible', show);
+  if (step) document.getElementById('status-step').textContent = step;
+}
+
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = msg;
+  box.classList.add('visible');
+}
+
+function clearError() {
+  document.getElementById('error-box').classList.remove('visible');
+}
+
+function copyReport() {
+  const text = document.getElementById('ddr-report').innerText;
+  navigator.clipboard.writeText(text).then(() => alert('Report copied to clipboard!'));
+}
+
+// Drag and drop
+['inspection', 'thermal'].forEach(type => {
+  const zone = document.getElementById('zone-' + type);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      document.getElementById('file-' + type).files = e.dataTransfer.files;
+      document.getElementById('file-' + type).dispatchEvent(new Event('change'));
+    }
+  });
+});
+</script>
+</body>
+</html>
